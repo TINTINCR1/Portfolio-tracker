@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Portfolio Tracker</title>
+</head>
+<body>
+  <h1>My Portfolio Tracker</h1>
+  <div id="data"></div>
+  <script>
+    const sheetID = 'https://docs.google.com/spreadsheets/d/18mYSgH1J1LhS4NvLUigd6yUunoZSy6sMpkZnpMUfix0/edit?gid=0#gid=0';
+    const apiKey = 'AIzaSyDaTApGt4wg4kRCr7SYSOK4l-Cizh4_PTc ';
+    const range = 'Sheet1!A1:L28'; // Adjust your range 
+
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${'https://docs.google.com/spreadsheets/d/18mYSgH1J1LhS4NvLUigd6yUunoZSy6sMpkZnpMUfix0/edit?gid=0#gid=0}/values/${Sheet1!A1:L28}?key=${AIzaSyDaTApGt4wg4kRCr7SYSOK4l-Cizh4_PTc}`;
+
+    fetch(url)
+      .then(response => response.json())
+      .then(data => {
+        const rows = data.values;
+        let html = '<table border="1">';
+        rows.forEach(row => {
+          html += '<tr>';
+          row.forEach(cell => html += `<td>${cell}</td>`);
+          html += '</tr>';
+        });
+        html += '</table>';
+        document.getElementById('data').innerHTML = html;
+      });
+  </script>
+</body>
+</html>
