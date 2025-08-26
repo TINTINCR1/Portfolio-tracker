@@ -3,17 +3,15 @@
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Live Portfolio Tracker</title>
+        <title>Static Portfolio Graphic</title>
         <!-- Tailwind CSS from CDN for modern, responsive styling -->
         <script src="https://cdn.tailwindcss.com"></script>
         <!-- Chart.js library for creating charts -->
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-        <!-- Google API Client Library -->
-        <script src="https://apis.google.com/js/api.js"></script>
         <style>
             /* Custom styles for a dark, clean look */
             body {
-                font-family: 'Inter', sans-serif;   
+                font-family: 'Inter', sans-serif;
                 background-color: #1a202c; /* Dark background */
                 color: #e2e8f0; /* Light text */
             }
@@ -27,297 +25,129 @@
         <div class="w-full max-w-5xl p-6 bg-gray-800 rounded-2xl shadow-lg border border-gray-700">
             
             <!-- Header -->
-            <div class="flex flex-col sm:flex-row items-center justify-between mb-6">
-                <h1 class="text-3xl font-extrabold text-white">My Portfolio</h1>
-                <div id="total-value" class="text-2xl font-bold text-green-400 mt-4 sm:mt-0">
-                    <!-- Total value will be dynamically inserted here -->
-                </div>
-            </div>
-
-            <!-- Authentication and Loading Indicators -->
-            <div id="auth-status" class="mb-4 text-center">
-                <button id="authorize_button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-xl shadow-lg transition-colors">
-                    Authorize and Load Data
-                </button>
-                <p id="loading-message" class="text-gray-400 mt-2 hidden">Loading data from Google Sheet...</p>
-            </div>
-
-            <!-- Portfolio Table -->
-            <div class="overflow-x-auto rounded-xl border border-gray-700 mb-8">
-                <table class="min-w-full bg-gray-900 rounded-xl">
-                    <thead>
-                        <tr class="bg-gray-700 text-gray-300 uppercase text-xs sm:text-sm leading-normal">
-                            <th class="py-3 px-3 sm:px-6 text-left rounded-tl-xl">Ticker</th>
-                            <th class="py-3 px-3 sm:px-6 text-left">Security Type</th>
-                            <th class="py-3 px-3 sm:px-6 text-left">Price</th>
-                            <th class="py-3 px-3 sm:px-6 text-left">Shares</th>
-                            <th class="py-3 px-3 sm:px-6 text-left">Value</th>
-                            <th class="py-3 px-3 sm:px-6 text-left">Purchase Price</th>
-                            <th class="py-3 px-3 sm:px-6 text-left">Cost Basis</th>
-                            <th class="py-3 px-3 sm:px-6 text-left rounded-tr-xl">Total Return %</th>
-                        </tr>
-                    </thead>
-                    <tbody id="portfolio-body" class="text-gray-200 text-xs sm:text-sm font-light">
-                        <tr><td colspan="8" class="text-center py-4 text-gray-400">Please authorize to load your portfolio.</td></tr>
-                    </tbody>
-                </table>
+            <div class="flex flex-col sm:flex-row items-center justify-center mb-6 text-center">
+                <h1 class="text-3xl font-extrabold text-white">Simple Portfolio Tracker (Static)</h1>
             </div>
 
             <!-- Charts Section -->
-            <div class="flex flex-col md:flex-row gap-8 hidden" id="charts-section">
+            <div class="flex flex-col md:flex-row gap-8" id="charts-section">
+                <!-- Bar Chart for Total Returns -->
+                <div class="w-full md:w-1/2 p-4 bg-gray-900 rounded-2xl border border-gray-700">
+                    <h2 class="text-xl font-bold text-white mb-4 text-center">My Returns</h2>
+                    <canvas id="barChart"></canvas>
+                </div>
+                
                 <!-- Pie Chart for Portfolio Allocation -->
                 <div class="w-full md:w-1/2 p-4 bg-gray-900 rounded-2xl border border-gray-700">
                     <h2 class="text-xl font-bold text-white mb-4 text-center">Portfolio Allocation</h2>
                     <canvas id="pieChart"></canvas>
                 </div>
-                
-                <!-- Bar Chart for Total Returns -->
-                <div class="w-full md:w-1/2 p-4 bg-gray-900 rounded-2xl border border-gray-700">
-                    <h2 class="text-xl font-bold text-white mb-4 text-center">Total Returns</h2>
-                    <canvas id="barChart"></canvas>
-                </div>
             </div>
         </div>
 
         <script>
-            // --- IMPORTANT: Replace with your own Google API credentials ---
-            const API_KEY = 'AIzaSyC4LcWbXvFwRxu6mPIkqornyiutkgaTMsI'; // Get this from Google Cloud Console
-            const CLIENT_ID = '827745851036-3op7qjmn7578vkmplgpib3egp1240e2l.apps.googleusercontent.com'; // Get this from Google Cloud Console
-            const SPREADSHEET_ID = '18mYSgH1J1LhS4NvLUigd6yUunoZSy6sMpkZnpMUfix0'; // Your spreadsheet ID
-            const RANGE = 'Sheet1!A5:L16'; // Adjust this to match your sheet's data range
-
-            // --- Core JavaScript Logic ---
-            const SCOPES = 'https://www.googleapis.com/auth/spreadsheets.readonly';
-            let tokenClient;
-
-            const authorizeButton = document.getElementById('authorize_button');
-            const loadingMessage = document.getElementById('loading-message');
-            const portfolioBody = document.getElementById('portfolio-body');
-            const totalValueEl = document.getElementById('total-value');
-            const chartsSection = document.getElementById('charts-section');
-
-            // Check for placeholder keys immediately
-            if (API_KEY === 'YOUR_API_KEY' || CLIENT_ID === 'YOUR_CLIENT_ID.apps.googleusercontent.com') {
-                authorizeButton.disabled = true;
-                authorizeButton.classList.add('bg-gray-600', 'cursor-not-allowed');
-                loadingMessage.textContent = "Please replace the placeholder API_KEY and CLIENT_ID in the code with your actual credentials.";
-                loadingMessage.classList.remove('hidden');
-            } else {
-                // Only proceed with loading if keys are not placeholders
-                window.onload = function() {
-                    const script = document.createElement('script');
-                    script.src = 'https://accounts.google.com/gsi/client';
-                    script.onload = () => {
-                        // Initialize the token client after the GIS script is loaded
-                        gisLoaded();
-                    };
-                    document.head.appendChild(script);
-                };
-                gapi.load('client', gapiLoaded);
-            }
-
-            // Handles the initial API client and auth library loading.
-            function gapiLoaded() {
-                gapi.client.init({
-                    apiKey: API_KEY,
-                    discoveryDocs: ['https://sheets.googleapis.com/$discovery/rest?version=v4'],
-                }).then(() => {
-                    // GIS initialization is now handled by the onload event listener
-                }).catch(err => {
-                    console.error("Error initializing gapi client:", err);
-                    loadingMessage.textContent = "Error: " + err.result.error.message;
-                    loadingMessage.classList.remove('hidden');
-                });
-            }
-
-            // Loads the Google Identity Services library.
-            function gisLoaded() {
-                tokenClient = google.accounts.oauth2.initTokenClient({
-                    client_id: CLIENT_ID,
-                    scope: SCOPES,
-                    callback: (tokenResponse) => {
-                        if (tokenResponse && tokenResponse.access_token) {
-                            gapi.client.setToken(tokenResponse);
-                            authorizeButton.textContent = 'Loading...';
-                            loadSheetData();
-                        } else {
-                            console.error("No access token received.");
-                            authorizeButton.textContent = 'Authorize and Load Data';
-                        }
-                    },
-                });
-                authorizeButton.disabled = false;
-            }
-
-            // Handles authorization and token retrieval.
-            function handleAuthClick() {
-                if (!tokenClient) {
-                    console.error("Token client is not initialized.");
-                    return;
-                }
-                tokenClient.requestAccessToken();
-            }
+            // --- Core JavaScript Logic for Static Charts ---
             
-            // Fetches data from the Google Sheet.
-            async function loadSheetData() {
-                loadingMessage.classList.remove('hidden');
-                authorizeButton.classList.add('hidden');
-                
-                try {
-                    const response = await gapi.client.sheets.spreadsheets.values.get({
-                        spreadsheetId: SPREADSHEET_ID,
-                        range: RANGE,
-                    });
-                    
-                    const rows = response.result.values;
-                    if (!rows || rows.length === 0) {
-                        portfolioBody.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-gray-400">No data found in the spreadsheet.</td></tr>`;
-                        loadingMessage.classList.add('hidden');
-                        return;
-                    }
-
-                    const portfolioData = rows.map(row => ({
-                        ticker: row[0],
-                        type: row[1],
-                        price: parseFloat(row[2].replace('$', '').replace(/,/g, '')),
-                        shares: parseFloat(row[3].replace('$', '').replace(/,/g, '')),
-                        purchasePrice: parseFloat(row[5].replace('$', '').replace(/,/g, '')),
-                        costBasis: parseFloat(row[6].replace('$', '').replace(/,/g, '')),
-                    }));
-                    
-                    renderPortfolio(portfolioData);
-                } catch (err) {
-                    console.error("Error loading data:", err);
-                    portfolioBody.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-red-400">Error: Could not load data. Check console for details. Make sure your spreadsheet ID is correct and the sheet is shared publicly or with your account.</td></tr>`;
-                } finally {
-                    loadingMessage.classList.add('hidden');
-                }
-            }
-
-            // Renders the portfolio table and charts.
-            function renderPortfolio(portfolioData) {
-                portfolioBody.innerHTML = '';
-                let totalPortfolioValue = 0;
-
-                portfolioData.forEach(item => {
-                    const totalAssetValue = item.price * item.shares;
-                    const costBasis = item.purchasePrice * item.shares;
-                    const totalReturn = ((totalAssetValue - costBasis) / costBasis) * 100;
-                    totalPortfolioValue += totalAssetValue;
-
-                    const row = document.createElement('tr');
-                    row.classList.add('hover:bg-gray-800', 'border-b', 'border-gray-700');
-                    const returnTextColor = totalReturn >= 0 ? 'text-green-400' : 'text-red-400';
-
-                    row.innerHTML = `
-                        <td class="py-3 px-3 sm:px-6 text-left whitespace-nowrap">${item.ticker}</td>
-                        <td class="py-3 px-3 sm:px-6 text-left">${item.type}</td>
-                        <td class="py-3 px-3 sm:px-6 text-left">$${item.price.toFixed(2)}</td>
-                        <td class="py-3 px-3 sm:px-6 text-left">${item.shares.toFixed(2)}</td>
-                        <td class="py-3 px-3 sm:px-6 text-left">$${totalAssetValue.toFixed(2)}</td>
-                        <td class="py-3 px-3 sm:px-6 text-left">$${item.purchasePrice.toFixed(2)}</td>
-                        <td class="py-3 px-3 sm:px-6 text-left">$${costBasis.toFixed(2)}</td>
-                        <td class="py-3 px-3 sm:px-6 text-left font-semibold ${returnTextColor}">${totalReturn.toFixed(2)}%</td>
-                    `;
-                    portfolioBody.appendChild(row);
-                });
-
-                totalValueEl.textContent = `Total Value: $${totalPortfolioValue.toFixed(2)}`;
-                chartsSection.classList.remove('hidden');
-
-                createPieChart(portfolioData);
-                createBarChart(portfolioData);
-            }
-
-            // Creates the Portfolio Allocation Pie Chart.
-            function createPieChart(portfolioData) {
-                const ctx = document.getElementById('pieChart').getContext('2d');
-                const data = portfolioData.map(item => item.price * item.shares);
-                const labels = portfolioData.map(item => item.ticker);
-                const backgroundColors = [
-                    '#4299e1', '#667eea', '#9f7aea', '#d53f8c', '#ed64a6',
-                    '#f6ad55', '#48bb78', '#38b2ac', '#4fd1c5', '#5a67d8',
-                    '#dd6b20', '#ecc94b'
+            // Wait for the window to load before running the script
+            window.onload = function() {
+                // Hardcoded data based on the provided screenshot
+                const portfolioData = [
+                    { ticker: 'AAPL', value: 227.16, return: 46.55 },
+                    { ticker: 'MSFT', value: 504.26, return: 125.12 },
+                    { ticker: 'MMM', value: 155.85, return: 35.52 },
+                    { ticker: 'PG', value: 156.15, return: 9.20 },
+                    { ticker: 'SPY', value: 642.47, return: 52.61 },
+                    { ticker: 'QQQ', value: 570.32, return: 50.08 },
+                    { ticker: 'VTI', value: 316.65, return: 75.92 },
+                    { ticker: 'VXUS', value: 71.65, return: 35.19 },
+                    { ticker: 'BTCUSD', value: 109825.80, return: 96.12 },
+                    { ticker: 'TLT', value: 86.80, return: 57.82 },
+                    { ticker: 'MD', value: 17.06, return: -95.13 },
+                    { ticker: 'SCHD', value: 27.77, return: 20.74 }
                 ];
 
-                // Destroy old chart instance if it exists to prevent rendering issues
-                if (window.myPieChart instanceof Chart) {
-                    window.myPieChart.destroy();
-                }
+                // Function to create the Bar Chart for Returns
+                function createBarChart(data) {
+                    const ctx = document.getElementById('barChart').getContext('2d');
+                    const labels = data.map(item => item.ticker);
+                    const returns = data.map(item => item.return);
+                    // Color bars based on positive or negative return
+                    const backgroundColors = returns.map(value => value >= 0 ? '#48bb78' : '#e53e3e');
 
-                window.myPieChart = new Chart(ctx, {
-                    type: 'pie',
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            data: data,
-                            backgroundColor: backgroundColors,
-                            hoverOffset: 4
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        plugins: {
-                            legend: {
-                                position: 'right',
-                                labels: {
-                                    color: '#e2e8f0'
+                    new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Total Return %',
+                                data: returns,
+                                backgroundColor: backgroundColors
+                            }]
+                        },
+                        options: {
+                            indexAxis: 'y', // Make the bars horizontal
+                            responsive: true,
+                            plugins: {
+                                legend: {
+                                    display: false
+                                },
+                                title: {
+                                    display: false
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    ticks: { color: '#e2e8f0' },
+                                    grid: { color: 'rgba(255,255,255,0.1)' }
+                                },
+                                y: {
+                                    ticks: { color: '#e2e8f0' },
+                                    grid: { color: 'rgba(255,255,255,0.1)' }
                                 }
                             }
                         }
-                    }
-                });
-            }
-
-            // Creates the Total Returns Bar Chart.
-            function createBarChart(portfolioData) {
-                const ctx = document.getElementById('barChart').getContext('2d');
-                const labels = portfolioData.map(item => item.ticker);
-                const data = portfolioData.map(item => {
-                    const totalAssetValue = item.price * item.shares;
-                    const costBasis = item.purchasePrice * item.shares;
-                    return ((totalAssetValue - costBasis) / costBasis) * 100;
-                });
-                const backgroundColors = data.map(value => value >= 0 ? '#48bb78' : '#e53e3e');
-
-                // Destroy old chart instance if it exists to prevent rendering issues
-                if (window.myBarChart instanceof Chart) {
-                    window.myBarChart.destroy();
+                    });
                 }
 
-                window.myBarChart = new Chart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            label: 'Total Return %',
-                            data: data,
-                            backgroundColor: backgroundColors
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        plugins: {
-                            legend: {
-                                display: false
-                            }
+                // Function to create the Pie Chart for Allocation
+                function createPieChart(data) {
+                    const ctx = document.getElementById('pieChart').getContext('2d');
+                    const labels = data.map(item => item.ticker);
+                    const values = data.map(item => item.value);
+                    const backgroundColors = [
+                        '#4299e1', '#667eea', '#9f7aea', '#d53f8c', '#ed64a6',
+                        '#f6ad55', '#48bb78', '#38b2ac', '#4fd1c5', '#5a67d8',
+                        '#dd6b20', '#ecc94b'
+                    ];
+
+                    new Chart(ctx, {
+                        type: 'pie',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                data: values,
+                                backgroundColor: backgroundColors,
+                                hoverOffset: 4
+                            }]
                         },
-                        scales: {
-                            x: {
-                                ticks: { color: '#e2e8f0' },
-                                grid: { color: 'rgba(255,255,255,0.1)' }
-                            },
-                            y: {
-                                ticks: { color: '#e2e8f0' },
-                                grid: { color: 'rgba(255,255,255,0.1)' }
+                        options: {
+                            responsive: true,
+                            plugins: {
+                                legend: {
+                                    position: 'right',
+                                    labels: {
+                                        color: '#e2e8f0'
+                                    }
+                                }
                             }
                         }
-                    }
-                });
-            }
+                    });
+                }
 
-            // Event Listeners for button click and API libraries
-            authorizeButton.onclick = handleAuthClick;
+                // Call the functions to create the charts
+                createBarChart(portfolioData);
+                createPieChart(portfolioData);
+            };
         </script>
     </body>
     </html>
