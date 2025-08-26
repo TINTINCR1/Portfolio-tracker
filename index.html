@@ -82,8 +82,8 @@
         // Your public spreadsheet ID and API key.
         const SPREADSHEET_ID = '18mYSgH1J1LhS4NvLUigd6yUunoZSy6sMpkZnpMUfix0';
         const API_KEY = 'AIzaSyDaTApGt4wg4kRCr7SYSOK4l-Cizh4_PTc'; 
-        // Range of the data to fetch. Adjust this to your sheet's data.
-        const DATA_RANGE = 'Sheet1!A1:L28';
+        // Range of the data to fetch. Using the full range from your first prompt.
+        const DATA_RANGE = 'Sheet1!A1:L28'; 
 
         // --- Core JavaScript Logic ---
         const loadButton = document.getElementById('load-data-button');
@@ -94,7 +94,6 @@
 
         // Handles the data fetching from the Google Sheet.
         async function loadSheetData() {
-            // Check for placeholder keys immediately
             if (API_KEY === 'YOUR_API_KEY') {
                 loadingMessage.textContent = "Please replace 'YOUR_API_KEY' with your actual API key in the code.";
                 loadingMessage.classList.remove('hidden');
@@ -114,22 +113,25 @@
                 }
 
                 const rows = data.values;
-                if (!rows || rows.length === 0) {
+                if (!rows || rows.length < 2) {
                     portfolioBody.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-gray-400">No data found in the spreadsheet.</td></tr>`;
                     loadingMessage.classList.add('hidden');
                     return;
                 }
 
+                // Skip the header rows and only process the actual data
+                const portfolioRows = rows.slice(4, 16); 
+
                 // Map fetched data to a structured format for easier use.
-                const portfolioData = rows.map(row => ({
-                    ticker: row[0],
-                    type: row[1],
-                    price: parseFloat(row[2].replace('$', '').replace(/,/g, '')),
-                    shares: parseFloat(row[3].replace('$', '').replace(/,/g, '')),
-                    purchasePrice: parseFloat(row[5].replace('$', '').replace(/,/g, '')),
-                    costBasis: parseFloat(row[6].replace('$', '').replace(/,/g, '')),
-                    // Use a regular expression to extract the number and convert to float
-                    return: parseFloat(row[7].replace(/%/, ''))
+                const portfolioData = portfolioRows.map(row => ({
+                    ticker: row[0] || '',
+                    type: row[1] || '',
+                    price: parseFloat(row[2]?.replace('$', '').replace(/,/g, '')) || 0,
+                    shares: parseFloat(row[3]?.replace('$', '').replace(/,/g, '')) || 0,
+                    value: parseFloat(row[4]?.replace('$', '').replace(/,/g, '')) || 0,
+                    purchasePrice: parseFloat(row[5]?.replace('$', '').replace(/,/g, '')) || 0,
+                    costBasis: parseFloat(row[6]?.replace('$', '').replace(/,/g, '')) || 0,
+                    return: parseFloat(row[7]?.replace(/%/, '')) || 0
                 }));
                 
                 renderPortfolio(portfolioData);
@@ -148,8 +150,7 @@
             let totalPortfolioValue = 0;
 
             portfolioData.forEach(item => {
-                const totalAssetValue = item.price * item.shares;
-                const costBasis = item.purchasePrice * item.shares;
+                const totalAssetValue = item.value;
                 totalPortfolioValue += totalAssetValue;
 
                 const row = document.createElement('tr');
@@ -163,7 +164,7 @@
                     <td class="py-3 px-3 sm:px-6 text-left">${item.shares.toFixed(2)}</td>
                     <td class="py-3 px-3 sm:px-6 text-left">$${totalAssetValue.toFixed(2)}</td>
                     <td class="py-3 px-3 sm:px-6 text-left">$${item.purchasePrice.toFixed(2)}</td>
-                    <td class="py-3 px-3 sm:px-6 text-left">$${costBasis.toFixed(2)}</td>
+                    <td class="py-3 px-3 sm:px-6 text-left">$${item.costBasis.toFixed(2)}</td>
                     <td class="py-3 px-3 sm:px-6 text-left font-semibold ${returnTextColor}">${item.return.toFixed(2)}%</td>
                 `;
                 portfolioBody.appendChild(row);
@@ -179,7 +180,7 @@
         // Creates the Portfolio Allocation Pie Chart.
         function createPieChart(portfolioData) {
             const ctx = document.getElementById('pieChart').getContext('2d');
-            const data = portfolioData.map(item => item.price * item.shares);
+            const data = portfolioData.map(item => item.value);
             const labels = portfolioData.map(item => item.ticker);
             const backgroundColors = [
                 '#4299e1', '#667eea', '#9f7aea', '#d53f8c', '#ed64a6',
