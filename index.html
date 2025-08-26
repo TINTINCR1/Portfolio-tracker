@@ -79,20 +79,15 @@
 
     <script>
         // --- IMPORTANT: Replace with your own Google API credentials ---
-        // Your public spreadsheet ID and API key.
         const SPREADSHEET_ID = '18mYSgH1J1LhS4NvLUigd6yUunoZSy6sMpkZnpMUfix0';
         const API_KEY = 'AIzaSyDaTApGt4wg4kRCr7SYSOK4l-Cizh4_PTc'; 
-        // Range of the data to fetch. Using the full range from your first prompt.
-        const DATA_RANGE = 'Sheet1!A1:L28'; 
-
-        // --- Core JavaScript Logic ---
+        
         const loadButton = document.getElementById('load-data-button');
         const loadingMessage = document.getElementById('loading-message');
         const portfolioBody = document.getElementById('portfolio-body');
         const totalValueEl = document.getElementById('total-value');
         const chartsSection = document.getElementById('charts-section');
 
-        // Handles the data fetching from the Google Sheet.
         async function loadSheetData() {
             if (API_KEY === 'YOUR_API_KEY') {
                 loadingMessage.textContent = "Please replace 'YOUR_API_KEY' with your actual API key in the code.";
@@ -104,7 +99,8 @@
             loadButton.classList.add('hidden');
             
             try {
-                const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${DATA_RANGE}?key=${API_KEY}`;
+                // Fetching the entire spreadsheet as a JSON object
+                const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/Sheet1?key=${API_KEY}`;
                 const response = await fetch(url);
                 const data = await response.json();
 
@@ -119,20 +115,30 @@
                     return;
                 }
 
-                // Skip the header rows and only process the actual data
-                const portfolioRows = rows.slice(4, 16); 
+                // Filtering out empty rows and handling potential malformed data
+                const filteredRows = rows.filter(row => row.length > 0 && row.some(cell => cell.trim() !== ''));
 
-                // Map fetched data to a structured format for easier use.
-                const portfolioData = portfolioRows.map(row => ({
-                    ticker: row[0] || '',
-                    type: row[1] || '',
-                    price: parseFloat(row[2]?.replace('$', '').replace(/,/g, '')) || 0,
-                    shares: parseFloat(row[3]?.replace('$', '').replace(/,/g, '')) || 0,
-                    value: parseFloat(row[4]?.replace('$', '').replace(/,/g, '')) || 0,
-                    purchasePrice: parseFloat(row[5]?.replace('$', '').replace(/,/g, '')) || 0,
-                    costBasis: parseFloat(row[6]?.replace('$', '').replace(/,/g, '')) || 0,
-                    return: parseFloat(row[7]?.replace(/%/, '')) || 0
-                }));
+                if (filteredRows.length < 2) {
+                    portfolioBody.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-gray-400">No portfolio data found.</td></tr>`;
+                    loadingMessage.classList.add('hidden');
+                    return;
+                }
+
+                // Assuming the data starts at the 5th row (index 4) and has 8 columns
+                const portfolioRows = filteredRows.slice(4, 16);
+
+                const portfolioData = portfolioRows.map(row => {
+                    return {
+                        ticker: row[0] || '',
+                        type: row[1] || '',
+                        price: parseFloat((row[2] || '0').replace('$', '').replace(/,/g, '')),
+                        shares: parseFloat((row[3] || '0').replace('$', '').replace(/,/g, '')),
+                        value: parseFloat((row[4] || '0').replace('$', '').replace(/,/g, '')),
+                        purchasePrice: parseFloat((row[5] || '0').replace('$', '').replace(/,/g, '')),
+                        costBasis: parseFloat((row[6] || '0').replace('$', '').replace(/,/g, '')),
+                        return: parseFloat((row[7] || '0').replace(/%/, ''))
+                    };
+                });
                 
                 renderPortfolio(portfolioData);
             } catch (err) {
@@ -144,7 +150,6 @@
             }
         }
 
-        // Renders the portfolio table and charts.
         function renderPortfolio(portfolioData) {
             portfolioBody.innerHTML = '';
             let totalPortfolioValue = 0;
@@ -177,7 +182,6 @@
             createBarChart(portfolioData);
         }
 
-        // Creates the Portfolio Allocation Pie Chart.
         function createPieChart(portfolioData) {
             const ctx = document.getElementById('pieChart').getContext('2d');
             const data = portfolioData.map(item => item.value);
@@ -188,7 +192,6 @@
                 '#dd6b20', '#ecc94b'
             ];
 
-            // Destroy old chart instance if it exists to prevent rendering issues
             if (window.myPieChart instanceof Chart) {
                 window.myPieChart.destroy();
             }
@@ -217,14 +220,12 @@
             });
         }
 
-        // Creates the Total Returns Bar Chart.
         function createBarChart(portfolioData) {
             const ctx = document.getElementById('barChart').getContext('2d');
             const labels = portfolioData.map(item => item.ticker);
             const data = portfolioData.map(item => item.return);
             const backgroundColors = data.map(value => value >= 0 ? '#48bb78' : '#e53e3e');
 
-            // Destroy old chart instance if it exists to prevent rendering issues
             if (window.myBarChart instanceof Chart) {
                 window.myBarChart.destroy();
             }
@@ -261,7 +262,6 @@
             });
         }
 
-        // Event Listeners for button click and API libraries
         loadButton.onclick = loadSheetData;
     </script>
 </body>
